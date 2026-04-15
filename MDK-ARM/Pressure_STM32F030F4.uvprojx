@@ -463,6 +463,26 @@
               </FileOption>
             </File>
             <File>
+              <FileName>cs1237.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/cs1237.c</FilePath>
+            </File>
+            <File>
+              <FileName>protocol.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/protocol.c</FilePath>
+            </File>
+            <File>
+              <FileName>pressure_threshold_store.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/pressure_threshold_store.c</FilePath>
+            </File>
+            <File>
+              <FileName>weight_calibration.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/weight_calibration.c</FilePath>
+            </File>
+            <File>
               <FileName>stm32f0xx_it.c</FileName>
               <FileType>1</FileType>
               <FilePath>../Core/Src/stm32f0xx_it.c</FilePath>

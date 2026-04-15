@@ -27,6 +27,9 @@ virtualFolder:
                 - path: ../Core/Src/stm32f0xx_it.c
                 - path: ../Core/Src/stm32f0xx_hal_msp.c
                 - path: ../Core/Src/cs1237.c
+                - path: ../Core/Src/protocol.c
+                - path: ../Core/Src/pressure_threshold_store.c
+                - path: ../Core/Src/weight_calibration.c
               folders: []
     - name: Drivers
       files: []
