@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>压力传感器自动标定上位机</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <div class="app-shell" data-tool="pressure-calibration-host">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">CS</div>
+        <div>
+          <p class="eyebrow">STM32F030F4 / CS1237</p>
+          <h1>压力传感器自动标定上位机</h1>
+        </div>
+      </div>
+      <div class="status-strip">
+        <span id="connectionState" class="status-pill" data-state="off">未连接</span>
+        <span id="frameState" class="status-pill">等待数据帧</span>
+        <span id="calState" class="status-pill">标定表未下发</span>
+      </div>
+      <div class="top-actions">
+        <button id="connectButton" class="primary-button" type="button">连接串口</button>
+        <button id="pingButton" type="button">握手</button>
+        <button id="clearLogButton" type="button">清日志</button>
+      </div>
+    </header>
+
+    <section id="startupNotice" class="startup-notice">
+      请用 Chrome 或 Edge 打开 <strong>http://localhost:4174</strong>，串口参数固定为 USART1 9600 8N1。
+    </section>
+
+    <main id="workspace" class="workspace">
+      <aside class="side-panel">
+        <section class="panel-section">
+          <h2>连接</h2>
+          <div class="serial-grid">
+            <label class="field">
+              <span>波特率</span>
+              <input id="baudRateInput" type="number" value="9600" min="1200" max="115200" step="100">
+            </label>
+            <label class="field">
+              <span>数据位</span>
+              <input value="8" disabled>
+            </label>
+            <label class="field">
+              <span>停止位</span>
+              <input value="1" disabled>
+            </label>
+            <label class="field">
+              <span>校验</span>
+              <input value="none" disabled>
+            </label>
+          </div>
+        </section>
+
+        <section class="panel-section">
+          <h2>采样参数</h2>
+          <label class="field">
+            <span>托盘重量 g</span>
+            <input id="trayWeightInput" type="number" value="21.8" step="0.1">
+          </label>
+          <label class="field">
+            <span>每点样本数</span>
+            <input id="sampleCountInput" type="number" value="25" min="5" max="120" step="1">
+          </label>
+          <label class="field">
+            <span>换码等待 ms</span>
+            <input id="settleMsInput" type="number" value="1500" min="0" max="10000" step="100">
+          </label>
+          <label class="field">
+            <span>基础极差 raw</span>
+            <input id="maxSpanInput" type="number" value="1500" min="1" step="10">
+          </label>
+          <label class="field">
+            <span>基础标准差 raw</span>
+            <input id="maxStdInput" type="number" value="550" min="1" step="10">
+          </label>
+          <label class="field">
+            <span>换砝码方式</span>
+            <input id="minDeltaInput" type="text" value="手动确认" disabled>
+          </label>
+          <button id="applySamplingConfigButton" class="success-button wide-button" type="button">参数已写入</button>
+        </section>
+
+        <section class="panel-section">
+          <h2>压力阈值</h2>
+          <label class="field">
+            <span>阈值 g</span>
+            <input id="thresholdInput" type="number" value="400" min="1" max="50000" step="1">
+          </label>
+          <button id="sendThresholdButton" class="success-button wide-button" type="button">写入 MCU 阈值</button>
+        </section>
+
+        <section class="panel-section">
+          <h2>标定动作</h2>
+          <div class="action-grid">
+            <button id="startButton" class="primary-button" type="button">开始自动标定</button>
+            <button id="captureButton" type="button">手动采当前点</button>
+            <button id="skipButton" type="button">确认下一点</button>
+            <button id="resetButton" type="button">重置采样</button>
+            <button id="sendTableButton" class="success-button" type="button">写入 MCU 标定表</button>
+            <button id="clearDeviceButton" class="danger-button" type="button">清除 MCU 标定表</button>
+          </div>
+        </section>
+
+        <section class="panel-section">
+          <h2>导出</h2>
+          <div class="action-grid">
+            <button id="exportCsvButton" type="button">CSV</button>
+            <button id="exportJsonButton" type="button">JSON</button>
+            <button id="exportHeaderButton" type="button">C 备份</button>
+            <button id="exportMarkdownButton" type="button">记录 MD</button>
+          </div>
+        </section>
+      </aside>
+
+      <section class="main-panel">
+        <div class="live-grid">
+          <div class="metric-block">
+            <span>Raw</span>
+            <strong id="liveRaw">--</strong>
+          </div>
+          <div class="metric-block">
+            <span>重量 g</span>
+            <strong id="liveWeight">--</strong>
+          </div>
+          <div class="metric-block">
+            <span>阈值 g</span>
+            <strong id="liveThreshold">--</strong>
+          </div>
+          <div class="metric-block">
+            <span>设备码</span>
+            <strong id="liveDevice">--</strong>
+          </div>
+          <div class="metric-block">
+            <span>帧序号</span>
+            <strong id="liveSeq">--</strong>
+          </div>
+          <div class="metric-block">
+            <span>帧速率</span>
+            <strong id="liveRate">--</strong>
+          </div>
+        </div>
+
+        <section class="run-panel">
+          <div>
+            <h2 id="autoPrompt">等待开始</h2>
+            <p id="stableState">尚未采样</p>
+          </div>
+          <div class="progress-shell">
+            <div id="progressBar" class="progress-bar"></div>
+          </div>
+        </section>
+
+        <section class="table-panel">
+          <table>
+            <thead>
+              <tr>
+                <th>点</th>
+                <th>砝码</th>
+                <th>目标总重</th>
+                <th>raw</th>
+                <th>均值</th>
+                <th>标准差</th>
+                <th>极差</th>
+                <th>样本</th>
+                <th>状态</th>
+              </tr>
+            </thead>
+            <tbody id="stepsBody"></tbody>
+          </table>
+        </section>
+
+        <section class="chart-panel">
+          <div class="panel-heading">
+            <h2>raw 实时曲线</h2>
+            <span id="chartRange">--</span>
+          </div>
+          <canvas id="rawChart" width="980" height="240"></canvas>
+        </section>
+      </section>
+
+      <aside class="log-panel">
+        <section class="panel-section">
+          <h2>MCU 应答</h2>
+          <div id="ackBox" class="ack-box">暂无应答</div>
+        </section>
+        <section class="panel-section log-section">
+          <h2>通信日志</h2>
+          <div id="logList" class="log-list"></div>
+        </section>
+      </aside>
+    </main>
+
+    <div id="ackDialog" class="ack-dialog" role="dialog" aria-modal="true" aria-labelledby="ackDialogTitle" hidden>
+      <div class="ack-dialog-card">
+        <div class="ack-dialog-mark" aria-hidden="true"></div>
+        <div class="ack-dialog-copy">
+          <h2 id="ackDialogTitle">写入 MCU 标定表结果</h2>
+          <p id="ackDialogMessage">等待 MCU 应答</p>
+        </div>
+        <button id="ackDialogClose" class="primary-button" type="button">知道了</button>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>

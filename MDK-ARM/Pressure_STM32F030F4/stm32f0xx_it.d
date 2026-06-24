@@ -33,3 +33,4 @@ pressure_stm32f030f4\stm32f0xx_it.o: ../Drivers/STM32F0xx_HAL_Driver/Inc/stm32f0
 pressure_stm32f030f4\stm32f0xx_it.o: ../Drivers/STM32F0xx_HAL_Driver/Inc/stm32f0xx_hal_uart.h
 pressure_stm32f030f4\stm32f0xx_it.o: ../Drivers/STM32F0xx_HAL_Driver/Inc/stm32f0xx_hal_uart_ex.h
 pressure_stm32f030f4\stm32f0xx_it.o: ../Core/Inc/stm32f0xx_it.h
+pressure_stm32f030f4\stm32f0xx_it.o: ../Core/Inc/usart.h

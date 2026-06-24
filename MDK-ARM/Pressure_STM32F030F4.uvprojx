@@ -473,6 +473,11 @@
               <FilePath>../Core/Src/protocol.c</FilePath>
             </File>
             <File>
+              <FileName>calibration_protocol.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/calibration_protocol.c</FilePath>
+            </File>
+            <File>
               <FileName>pressure_threshold_store.c</FileName>
               <FileType>1</FileType>
               <FilePath>../Core/Src/pressure_threshold_store.c</FilePath>

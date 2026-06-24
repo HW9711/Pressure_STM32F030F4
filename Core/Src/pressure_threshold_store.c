@@ -7,13 +7,46 @@ typedef struct {
   uint32_t check;        /* 完整性校验值 */
 } PressureThresholdFlash_t;
 
+static uint16_t g_pressure_threshold_runtime_g = PRESSURE_THRESHOLD_DEFAULT_G;
+
+uint8_t PressureThreshold_IsValid(uint16_t threshold_g)
+{
+  return ((threshold_g > 0U) && (threshold_g <= PRESSURE_THRESHOLD_MAX_G)) ? 1U : 0U;
+}
+
+uint16_t PressureThreshold_GetRuntime(void)
+{
+  return g_pressure_threshold_runtime_g;
+}
+
+void PressureThreshold_SetRuntime(uint16_t threshold_g)
+{
+  if (PressureThreshold_IsValid(threshold_g) != 0U) {
+    g_pressure_threshold_runtime_g = threshold_g;
+  }
+}
+
+uint8_t PressureThreshold_SetRuntimeAndSave(uint16_t threshold_g)
+{
+  if (PressureThreshold_IsValid(threshold_g) == 0U) {
+    return 0U;
+  }
+  if (PressureThreshold_Save(threshold_g) == 0U) {
+    return 0U;
+  }
+  g_pressure_threshold_runtime_g = threshold_g;
+  return 1U;
+}
+
 /* 生成简单校验值，防止上电读到半写入或脏数据 */
+#if (PRESSURE_THRESHOLD_FLASH_STORE_ENABLE != 0U)
 static uint32_t PressureThreshold_MakeCheck(uint32_t threshold_g)
 {
   return (PRESSURE_THRESHOLD_FLASH_MAGIC ^ threshold_g ^ 0xA5A55A5AUL);
 }
 
 /* 将阈值写入内部 Flash（使用末页，擦除后重写） */
+#endif
 uint8_t PressureThreshold_Save(uint16_t threshold_g)
 {
 #if (PRESSURE_THRESHOLD_FLASH_STORE_ENABLE != 0U)
@@ -23,7 +56,7 @@ uint8_t PressureThreshold_Save(uint16_t threshold_g)
   HAL_StatusTypeDef hal_ret;                 /* HAL 接口返回值 */
 
   /* 运行时参数保护，避免写入明显异常阈值 */
-  if ((threshold_g == 0U) || (threshold_g > PRESSURE_THRESHOLD_MAX_G)) {
+  if (PressureThreshold_IsValid(threshold_g) == 0U) {
     return 0U;
   }
 

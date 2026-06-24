@@ -35,6 +35,9 @@ pressure_stm32f030f4\main.o: ../Drivers/STM32F0xx_HAL_Driver/Inc/stm32f0xx_hal_u
 pressure_stm32f030f4\main.o: ../Core/Inc/usart.h
 pressure_stm32f030f4\main.o: ../Core/Inc/gpio.h
 pressure_stm32f030f4\main.o: ../Core/Inc/cs1237.h
+pressure_stm32f030f4\main.o: ../Core/Inc/pressure_debug_uart.h
+pressure_stm32f030f4\main.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h
 pressure_stm32f030f4\main.o: ../Core/Inc/protocol.h
 pressure_stm32f030f4\main.o: ../Core/Inc/pressure_threshold_store.h
 pressure_stm32f030f4\main.o: ../Core/Inc/weight_calibration.h
+pressure_stm32f030f4\main.o: ../Core/Inc/calibration_protocol.h

@@ -21,9 +21,11 @@
 #include "usart.h"
 #include "gpio.h"
 #include "cs1237.h"
+#include "pressure_debug_uart.h"
 #include "protocol.h"
 #include "pressure_threshold_store.h"
 #include "weight_calibration.h"
+#include "calibration_protocol.h"
 
 
 /* Private includes ----------------------------------------------------------*/
@@ -97,8 +99,12 @@ int main(void)
 
   /* 设置修正系数，空载时做一次去皮 */
   CS1237_SetScaleFactor(CS1237_SCALE_FACTOR);
+#if (PRESSURE_UART_DEBUG_TEXT_ENABLE != 0U)
+  char debug_txbuf[PRESSURE_UART_DEBUG_TEXT_BUF_SIZE] = {0};
+#else
   uint8_t txbuf[CS1237_UART_PROTOCOL_FRAME_SIZE] = {0};
   uint8_t tx_seq = 0U;
+#endif
 
   /* 保存 CS1237 原始码值 */
   int32_t raw_value = 0;
@@ -110,11 +116,15 @@ int main(void)
   if (PressureThreshold_Load(&pressure_threshold_g) == 0U) {
     pressure_threshold_g = PRESSURE_THRESHOLD_DEFAULT_G;
   }
+  PressureThreshold_SetRuntime(pressure_threshold_g);
+  WeightCalibration_LoadRuntimeFromFlash();
+  CalibrationProtocol_Init(&huart1);
 
   /* 可选：启动时强制写入宏定义阈值，常用于首次配置 */
 #if (PRESSURE_THRESHOLD_FLASH_STORE_ENABLE != 0U) && (PRESSURE_THRESHOLD_FORCE_WRITE_ON_BOOT != 0U)
   pressure_threshold_g = (uint16_t)PRESSURE_THRESHOLD_FORCE_VALUE_G;
   (void)PressureThreshold_Save(pressure_threshold_g);
+  PressureThreshold_SetRuntime(pressure_threshold_g);
 #endif
   /* USER CODE END 2 */
   /* 对称去抖：计数器和稳定状态（1=高，0=低），默认上拉为高 */
@@ -126,8 +136,9 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-    /* 读取一次 CS1237 24bit 原始码值 */
-    raw_value = CS1237_ReadRawSigned();
+    CalibrationProtocol_Process(&huart1);
+    /* 读取 CS1237 中值 raw，上传帧格式不变，仅抑制单次尖峰。 */
+    raw_value = CS1237_ReadMedian(0U);
 
     /* 按标定系数换算传感器测量值 */
     adjusted_value_x10 = WeightCalibration_ApplySegmentCalibrationX10(raw_value);
@@ -148,13 +159,23 @@ int main(void)
     
     /* 通过 USART1 输出原始值和最终重量以及st1、st2、st3、st4 */
     {
+#if (PRESSURE_UART_DEBUG_TEXT_ENABLE != 0U)
+      uint16_t debug_len = PressureDebugUart_FormatSampleLine(debug_txbuf,
+                                                              sizeof(debug_txbuf),
+                                                              raw_value,
+                                                              adjusted_value_x10);
+
+      if (debug_len > 0U) {
+        (void)HAL_UART_Transmit(&huart1, (uint8_t *)debug_txbuf, debug_len, 100);
+      }
+#else
       uint8_t device_code = CS1237UartProtocol_PackDeviceCode(st1, st2, st3, st4);
       uint16_t frame_len = CS1237UartProtocol_BuildReportFrame(txbuf,
                                                                sizeof(txbuf),
                                                                tx_seq,
                                                                raw_value,
                                                                adjusted_value_x10,
-                                                               pressure_threshold_g,
+                                                               PressureThreshold_GetRuntime(),
                                                                device_code);
 
       if (frame_len > 0U) {
@@ -162,9 +183,11 @@ int main(void)
           tx_seq++;
         }
       }
+#endif
     }
     /* 采样周期 200ms，可根据需要调整 */
     HAL_Delay(200);
+    CalibrationProtocol_Process(&huart1);
 
     /* USER CODE BEGIN 3 */
   }

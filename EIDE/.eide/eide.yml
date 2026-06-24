@@ -28,6 +28,7 @@ virtualFolder:
                 - path: ../Core/Src/stm32f0xx_hal_msp.c
                 - path: ../Core/Src/cs1237.c
                 - path: ../Core/Src/protocol.c
+                - path: ../Core/Src/calibration_protocol.c
                 - path: ../Core/Src/pressure_threshold_store.c
                 - path: ../Core/Src/weight_calibration.c
               folders: []
@@ -176,7 +177,7 @@ targets:
               isChecked: true
               isStartup: true
               mem:
-                size: "0x4000"
+                size: "0x3800"
                 startAddr: "0x08000000"
               tag: IROM
             - id: 2
@@ -196,7 +197,7 @@ targets:
           vendor: ST
         otherCmds: ""
         proType: 1
-        speed: 8000
+        speed: 4000
       STLink:
         address: "0x08000000"
         bin: ""
