@@ -66,6 +66,7 @@ HAL_StatusTypeDef CS1237_SetSpeed(CS1237_Speed_t speed);
 uint8_t CS1237_IsReady(void);
 int32_t CS1237_ReadRawSigned(void);
 int32_t CS1237_ReadMedian(uint8_t samples);
+uint8_t CS1237_ReadMedianChecked(uint8_t samples, int32_t *raw_value);
 
 /* 比例系数相关接口，通常用于把原始值换算成工程量 */
 void CS1237_SetScaleFactor(uint32_t factor);

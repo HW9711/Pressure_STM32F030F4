@@ -34,6 +34,5 @@ pressure_stm32f030f4\calibration_protocol.o: ../Drivers/STM32F0xx_HAL_Driver/Inc
 pressure_stm32f030f4\calibration_protocol.o: ../Drivers/STM32F0xx_HAL_Driver/Inc/stm32f0xx_hal_uart.h
 pressure_stm32f030f4\calibration_protocol.o: ../Drivers/STM32F0xx_HAL_Driver/Inc/stm32f0xx_hal_uart_ex.h
 pressure_stm32f030f4\calibration_protocol.o: ../Core/Inc/usart.h
-pressure_stm32f030f4\calibration_protocol.o: ../Core/Inc/weight_calibration.h
 pressure_stm32f030f4\calibration_protocol.o: ../Core/Inc/pressure_threshold_store.h
 pressure_stm32f030f4\calibration_protocol.o: ../Core/Inc/protocol.h

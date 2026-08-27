@@ -29,7 +29,9 @@ virtualFolder:
                 - path: ../Core/Src/cs1237.c
                 - path: ../Core/Src/protocol.c
                 - path: ../Core/Src/calibration_protocol.c
+                - path: ../Core/Src/pressure_auto_zero.c
                 - path: ../Core/Src/pressure_threshold_store.c
+                - path: ../Core/Src/pressure_zero_store.c
                 - path: ../Core/Src/weight_calibration.c
               folders: []
     - name: Drivers

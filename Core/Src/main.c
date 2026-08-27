@@ -25,6 +25,7 @@
 #include "protocol.h"
 #include "pressure_threshold_store.h"
 #include "weight_calibration.h"
+#include "pressure_auto_zero.h"
 #include "calibration_protocol.h"
 
 
@@ -40,6 +41,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+/* 压力值下降滤波分母：堵管停泵后低值抖动按 1/4 逐帧回落，避免压力显示和闭环输入瞬间掉到低值。 */
+#define PRESSURE_FILTER_FALL_DIV        4U
 
 /* USER CODE END PD */
 
@@ -53,12 +56,57 @@
 /* USER CODE BEGIN PV */
 /* 当前压力阈值，单位 g，默认使用宏定义值 */
 static uint16_t pressure_threshold_g = PRESSURE_THRESHOLD_DEFAULT_G;
+static uint8_t pressure_filter_ready = 0U;
+static uint32_t pressure_filtered_x10 = 0U;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 
 /* USER CODE BEGIN 0 */
+/*
+ * 函数功能：对标定后的压力值做跨帧滤波，压力上升立即跟随，压力下降按比例缓慢回落。
+ * 输入参数：current_x10 当前帧标定后的压力值，单位 0.1g。
+ * 返回参数：滤波后的压力值，单位 0.1g，用于串口上报和主控闭环判断。
+ */
+static uint32_t PressureFilter_ApplyX10(uint32_t current_x10)
+{
+  /* 保存当前帧与滤波值之间的下降差值，单位 0.1g。 */
+  uint32_t drop_x10;
+
+  /* 首帧直接采用当前压力，保证上电后显示和闭环输入没有人为延迟。 */
+  if (pressure_filter_ready == 0U) {
+    /* 标记滤波器已经初始化，后续帧才进入上升/下降分支。 */
+    pressure_filter_ready = 1U;
+    /* 首帧作为滤波基准，避免默认 0 参与压力计算。 */
+    pressure_filtered_x10 = current_x10;
+    /* 返回首帧压力，保持启动阶段行为直观。 */
+    return pressure_filtered_x10;
+  }
+
+  /* 压力上升直接跟随，确保堵管压力升高时主控能及时触发保护。 */
+  if (current_x10 >= pressure_filtered_x10) {
+    /* 当前值更高时立即刷新滤波值，不延迟保护阈值判断。 */
+    pressure_filtered_x10 = current_x10;
+    /* 返回最新高值，让上报压力和闭环输入同步抬升。 */
+    return pressure_filtered_x10;
+  }
+
+  /* 压力下降时计算与上一帧滤波值的差值，用于分段回落。 */
+  drop_x10 = pressure_filtered_x10 - current_x10;
+  /* 下降只回落差值的 1/PRESSURE_FILTER_FALL_DIV，抑制停泵后的低值跳变。 */
+  pressure_filtered_x10 -=
+      (drop_x10 + PRESSURE_FILTER_FALL_DIV - 1U) / PRESSURE_FILTER_FALL_DIV;
+
+  /* 返回慢速回落后的压力，避免主控收到忽高忽低的压力输入。 */
+  return pressure_filtered_x10;
+}
+
+static void PressureFilter_Reset(void)
+{
+  pressure_filter_ready = 0U;
+  pressure_filtered_x10 = 0U;
+}
 /* USER CODE END 0 */
 
 /**
@@ -97,8 +145,6 @@ int main(void)
   CS1237_Init();
   CS1237_SetGain(CS1237_GAIN_2);
 
-  /* 设置修正系数，空载时做一次去皮 */
-  CS1237_SetScaleFactor(CS1237_SCALE_FACTOR);
 #if (PRESSURE_UART_DEBUG_TEXT_ENABLE != 0U)
   char debug_txbuf[PRESSURE_UART_DEBUG_TEXT_BUF_SIZE] = {0};
 #else
@@ -111,13 +157,15 @@ int main(void)
 
   /* 保存换算后的传感器测量值，单位 0.1g */
   uint32_t adjusted_value_x10 = 0;
+  uint8_t sample_valid = 0U;
+  uint8_t device_code = 0U;
 
   /* 启动时读取阈值；若无有效数据则使用默认值 */
   if (PressureThreshold_Load(&pressure_threshold_g) == 0U) {
     pressure_threshold_g = PRESSURE_THRESHOLD_DEFAULT_G;
   }
   PressureThreshold_SetRuntime(pressure_threshold_g);
-  WeightCalibration_LoadRuntimeFromFlash();
+  PressureAutoZero_Init();
   CalibrationProtocol_Init(&huart1);
 
   /* 可选：启动时强制写入宏定义阈值，常用于首次配置 */
@@ -130,7 +178,7 @@ int main(void)
   /* 对称去抖：计数器和稳定状态（1=高，0=低），默认上拉为高 */
   uint8_t cnt1 = 0, cnt2 = 0, cnt3 = 0, cnt4 = 0;
   uint8_t st1 = 1, st2 = 1, st3 = 1, st4 = 1;
-  const uint8_t TH = 5;
+  const uint8_t TH = 2;
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
@@ -138,12 +186,10 @@ int main(void)
     /* USER CODE END WHILE */
     CalibrationProtocol_Process(&huart1);
     /* 读取 CS1237 中值 raw，上传帧格式不变，仅抑制单次尖峰。 */
-    raw_value = CS1237_ReadMedian(0U);
-
-    /* 按标定系数换算传感器测量值 */
-    adjusted_value_x10 = WeightCalibration_ApplySegmentCalibrationX10(raw_value);
-
-
+    sample_valid = CS1237_ReadMedianChecked(0U, &raw_value);
+    if (sample_valid == 0U) {
+      raw_value = 0;
+    }
 
     /* 原始读数：SET=高(1)，RESET=低(0) */
     uint8_t r1 = (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_1) == GPIO_PIN_SET) ? 1 : 0;
@@ -156,7 +202,23 @@ int main(void)
     if (r2 != st2) { if (cnt2 < TH) cnt2++; if (cnt2 >= TH) { st2 = r2; cnt2 = 0; } } else { cnt2 = 0; }
     if (r3 != st3) { if (cnt3 < TH) cnt3++; if (cnt3 >= TH) { st3 = r3; cnt3 = 0; } } else { cnt3 = 0; }
     if (r4 != st4) { if (cnt4 < TH) cnt4++; if (cnt4 >= TH) { st4 = r4; cnt4 = 0; } } else { cnt4 = 0; }
-    
+
+    device_code = CS1237UartProtocol_PackDeviceCode(st1, st2, st3, st4);
+    PressureAutoZero_Update(raw_value, sample_valid, device_code);
+    if ((sample_valid != 0U) && (PressureAutoZero_IsReady() != 0U)) {
+      int32_t boot_empty_raw = PressureAutoZero_GetBootEmptyRaw();
+      int32_t current_from_empty_raw = raw_value - boot_empty_raw;
+      int32_t session_zero_from_empty_raw =
+          PressureAutoZero_GetSessionZeroRaw() - boot_empty_raw;
+      adjusted_value_x10 = WeightCalibration_ApplySessionX10(
+          current_from_empty_raw,
+          session_zero_from_empty_raw);
+      adjusted_value_x10 = PressureFilter_ApplyX10(adjusted_value_x10);
+    } else {
+      PressureFilter_Reset();
+      adjusted_value_x10 = PRESSURE_AUTO_ZERO_FAILSAFE_X10;
+    }
+
     /* 通过 USART1 输出原始值和最终重量以及st1、st2、st3、st4 */
     {
 #if (PRESSURE_UART_DEBUG_TEXT_ENABLE != 0U)
@@ -169,7 +231,6 @@ int main(void)
         (void)HAL_UART_Transmit(&huart1, (uint8_t *)debug_txbuf, debug_len, 100);
       }
 #else
-      uint8_t device_code = CS1237UartProtocol_PackDeviceCode(st1, st2, st3, st4);
       uint16_t frame_len = CS1237UartProtocol_BuildReportFrame(txbuf,
                                                                sizeof(txbuf),
                                                                tx_seq,

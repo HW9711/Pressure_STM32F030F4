@@ -1,12 +1,11 @@
 #include "calibration_protocol.h"
-#include "weight_calibration.h"
 #include "pressure_threshold_store.h"
 #include "protocol.h"
 
 #define CAL_PROTOCOL_RX_BUF_SIZE          96U
 #define CAL_PROTOCOL_RING_BUF_SIZE        128U
 #define CAL_PROTOCOL_TX_BUF_SIZE          24U
-#define CAL_PROTOCOL_MAX_PAYLOAD_SIZE     (1U + (WEIGHT_CALIBRATION_MAX_POINTS * 8U))
+#define CAL_PROTOCOL_MAX_PAYLOAD_SIZE     65U
 #define CAL_PROTOCOL_FIXED_OVERHEAD       10U
 #define CAL_PROTOCOL_ACK_PAYLOAD_SIZE     4U
 
@@ -25,23 +24,6 @@ static volatile uint8_t g_cal_tx_pending = 0U;
 static uint16_t CalibrationProtocol_ReadU16Le(const uint8_t *data)
 {
   return (uint16_t)((uint16_t)data[0] | ((uint16_t)data[1] << 8));
-}
-
-static int32_t CalibrationProtocol_ReadI32Le(const uint8_t *data)
-{
-  uint32_t value = ((uint32_t)data[0]) |
-                   ((uint32_t)data[1] << 8) |
-                   ((uint32_t)data[2] << 16) |
-                   ((uint32_t)data[3] << 24);
-  return (int32_t)value;
-}
-
-static uint32_t CalibrationProtocol_ReadU32Le(const uint8_t *data)
-{
-  return ((uint32_t)data[0]) |
-         ((uint32_t)data[1] << 8) |
-         ((uint32_t)data[2] << 16) |
-         ((uint32_t)data[3] << 24);
 }
 
 static void CalibrationProtocol_WriteU16Le(uint8_t *data, uint16_t value)
@@ -92,8 +74,8 @@ static void CalibrationProtocol_BuildAck(uint8_t cmd, uint8_t seq, uint8_t statu
   g_cal_tx_buf[4] = CAL_PROTOCOL_ACK_PAYLOAD_SIZE;
   g_cal_tx_buf[5] = seq;
   g_cal_tx_buf[6] = status;
-  g_cal_tx_buf[7] = WeightCalibration_HasRuntimeTable();
-  g_cal_tx_buf[8] = WeightCalibration_GetRuntimePointCount();
+  g_cal_tx_buf[7] = 0U;
+  g_cal_tx_buf[8] = 0U;
   g_cal_tx_buf[9] = 0U;
 
   crc = CS1237UartProtocol_Crc16Modbus(&g_cal_tx_buf[2],
@@ -103,37 +85,6 @@ static void CalibrationProtocol_BuildAck(uint8_t cmd, uint8_t seq, uint8_t statu
   g_cal_tx_buf[13] = CAL_PROTOCOL_TAIL1;
   g_cal_tx_len = 14U;
   g_cal_tx_pending = 1U;
-}
-
-static uint8_t CalibrationProtocol_HandleSetTable(const uint8_t *payload, uint8_t payload_len)
-{
-  WeightCalibrationPoint_t points[WEIGHT_CALIBRATION_MAX_POINTS];
-  uint8_t point_count;
-  uint8_t i;
-
-  if (payload_len < 1U) {
-    return CAL_PROTOCOL_STATUS_BAD_LENGTH;
-  }
-
-  point_count = payload[0];
-  if ((point_count < 2U) || (point_count > WEIGHT_CALIBRATION_MAX_POINTS)) {
-    return CAL_PROTOCOL_STATUS_BAD_TABLE;
-  }
-  if (payload_len != (uint8_t)(1U + (point_count * 8U))) {
-    return CAL_PROTOCOL_STATUS_BAD_LENGTH;
-  }
-
-  for (i = 0U; i < point_count; i++) {
-    const uint8_t *point_payload = &payload[1U + (i * 8U)];
-    points[i].raw_value = CalibrationProtocol_ReadI32Le(&point_payload[0]);
-    points[i].real_x10 = CalibrationProtocol_ReadU32Le(&point_payload[4]);
-  }
-
-  if (WeightCalibration_SaveRuntimeTable(points, point_count) == 0U) {
-    return CAL_PROTOCOL_STATUS_FLASH_FAIL;
-  }
-
-  return CAL_PROTOCOL_STATUS_OK;
 }
 
 static uint8_t CalibrationProtocol_HandleSetThreshold(const uint8_t *payload, uint8_t payload_len)
@@ -172,14 +123,9 @@ static void CalibrationProtocol_HandleFrame(const uint8_t *frame, uint8_t frame_
     }
     break;
   case CAL_PROTOCOL_CMD_SET_TABLE:
-    status = CalibrationProtocol_HandleSetTable(payload, payload_len);
-    break;
   case CAL_PROTOCOL_CMD_CLEAR_TABLE:
-    if (payload_len != 0U) {
-      status = CAL_PROTOCOL_STATUS_BAD_LENGTH;
-    } else if (WeightCalibration_ClearRuntimeTable() == 0U) {
-      status = CAL_PROTOCOL_STATUS_FLASH_FAIL;
-    }
+    /* These legacy commands must never erase the factory-empty page. */
+    status = CAL_PROTOCOL_STATUS_UNKNOWN_CMD;
     break;
   case CAL_PROTOCOL_CMD_SET_THRESHOLD:
     status = CalibrationProtocol_HandleSetThreshold(payload, payload_len);

@@ -38,7 +38,7 @@ void protocol_compile_test(void)
                                             -123456,
                                             3210U,
                                             350U,
-                                            CS1237_UART_PROTOCOL_DEVICE_CODE_1111);
+                                            CS1237_UART_PROTOCOL_DEVICE_CODE_INJECT_WATER);
 
     (void)written;
     (void)CS1237UartProtocol_PackDeviceCode(1U, 0U, 0U, 1U);

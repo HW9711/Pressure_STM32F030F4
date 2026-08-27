@@ -40,4 +40,5 @@ pressure_stm32f030f4\main.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h
 pressure_stm32f030f4\main.o: ../Core/Inc/protocol.h
 pressure_stm32f030f4\main.o: ../Core/Inc/pressure_threshold_store.h
 pressure_stm32f030f4\main.o: ../Core/Inc/weight_calibration.h
+pressure_stm32f030f4\main.o: ../Core/Inc/pressure_auto_zero.h
 pressure_stm32f030f4\main.o: ../Core/Inc/calibration_protocol.h

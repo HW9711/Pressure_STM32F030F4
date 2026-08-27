@@ -7,6 +7,8 @@
 static uint32_t g_cs1237_scale_factor = 1206U;
 /* 去皮值：保存空载时的原始 ADC 读数 */
 static int32_t g_cs1237_tare_raw = 0;
+/* Distinguishes a valid zero raw value from a ready-timeout return value. */
+static uint8_t g_cs1237_last_frame_valid = 0U;
 /* 当前芯片配置缓存，避免每次修改时都从外部重建 */
 static uint8_t g_cs1237_config =
     (uint8_t)((CS1237_REFO_OFF_DEFAULT ? 0x40U : 0x00U) |
@@ -141,6 +143,7 @@ static int32_t CS1237_ReadDataFrame(uint8_t *update1, uint8_t *update2)
     uint8_t i;
     uint32_t raw24 = 0U;
 
+    g_cs1237_last_frame_valid = 0U;
     if (update1 != NULL) {
         *update1 = 0U;
     }
@@ -194,6 +197,7 @@ static int32_t CS1237_ReadDataFrame(uint8_t *update1, uint8_t *update2)
         raw24 |= 0xFF000000U;
     }
 
+    g_cs1237_last_frame_valid = 1U;
     return (int32_t)raw24;
 }
 
@@ -323,9 +327,21 @@ int32_t CS1237_ReadRawSigned(void)
 /* 连续读取若干次原始值后排序，并返回中值，用于抑制尖峰噪声 */
 int32_t CS1237_ReadMedian(uint8_t samples)
 {
+    int32_t raw_value = 0;
+
+    (void)CS1237_ReadMedianChecked(samples, &raw_value);
+    return raw_value;
+}
+
+uint8_t CS1237_ReadMedianChecked(uint8_t samples, int32_t *raw_value)
+{
     int32_t buf[CS1237_MEDIAN_LEN];
     uint8_t i;
     uint8_t median_idx;
+
+    if (raw_value == NULL) {
+        return 0U;
+    }
 
     /* 允许外部传 0，表示默认使用预设中值长度 */
     if (samples == 0U) {
@@ -339,13 +355,17 @@ int32_t CS1237_ReadMedian(uint8_t samples)
     /* 逐个采样，形成滤波样本 */
     for (i = 0U; i < samples; i++) {
         buf[i] = CS1237_ReadRawSigned();
+        if (g_cs1237_last_frame_valid == 0U) {
+            return 0U;
+        }
     }
 
     /* 排序后取中间值，得到比单次采样更稳定的结果 */
     CS1237_SortAsc(buf, samples);
     median_idx = samples / 2U;
 
-    return buf[median_idx];
+    *raw_value = buf[median_idx];
+    return 1U;
 }
 
 /* 设置换算比例系数，0 值无效，不覆盖当前配置 */

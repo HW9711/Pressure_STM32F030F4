@@ -43,12 +43,10 @@ extern "C" {
 #define CS1237_UART_PROTOCOL_OFFSET_TAIL0           19U
 #define CS1237_UART_PROTOCOL_OFFSET_TAIL1           20U
 
-/* 当前约定的合法设备类型码，对应 PA1~PA4 的霍尔稳定状态 */
-#define CS1237_UART_PROTOCOL_DEVICE_CODE_1111   0x0FU
-#define CS1237_UART_PROTOCOL_DEVICE_CODE_1110   0x0EU
-#define CS1237_UART_PROTOCOL_DEVICE_CODE_1100   0x0CU
-#define CS1237_UART_PROTOCOL_DEVICE_CODE_1000   0x08U
-#define CS1237_UART_PROTOCOL_DEVICE_CODE_1001   0x09U
+/* Device codes currently recognized by the main controller. */
+#define CS1237_UART_PROTOCOL_DEVICE_CODE_INJECT_WATER   0x07U
+#define CS1237_UART_PROTOCOL_DEVICE_CODE_POUR_WATER     0x0EU
+#define CS1237_UART_PROTOCOL_DEVICE_CODE_DRAW_WATER     0x0DU
 
 /* 把 4 路霍尔稳定状态打包为设备码：PA1..PA4 对应 bit3..bit0 */
 uint8_t CS1237UartProtocol_PackDeviceCode(uint8_t st1,
@@ -56,7 +54,7 @@ uint8_t CS1237UartProtocol_PackDeviceCode(uint8_t st1,
                                           uint8_t st3,
                                           uint8_t st4);
 
-/* 判断设备码是否属于当前定义的 5 种合法组合 */
+/* Return 1 only when the main controller recognizes this pump code. */
 uint8_t CS1237UartProtocol_IsKnownDeviceCode(uint8_t device_code);
 
 /* 计算 CRC16/MODBUS，初值 0xFFFF，多项式 0xA001 */

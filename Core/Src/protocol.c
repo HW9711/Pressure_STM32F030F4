@@ -30,13 +30,11 @@ uint8_t CS1237UartProtocol_PackDeviceCode(uint8_t st1,
 
 uint8_t CS1237UartProtocol_IsKnownDeviceCode(uint8_t device_code)
 {
-    /* 只校验低 4 位，高位即使被污染也不影响设备码判定 */
+    /* Keep the same low-nibble wire encoding used by the report frame. */
     switch (device_code & 0x0FU) {
-    case CS1237_UART_PROTOCOL_DEVICE_CODE_1111:
-    case CS1237_UART_PROTOCOL_DEVICE_CODE_1110:
-    case CS1237_UART_PROTOCOL_DEVICE_CODE_1100:
-    case CS1237_UART_PROTOCOL_DEVICE_CODE_1000:
-    case CS1237_UART_PROTOCOL_DEVICE_CODE_1001:
+    case CS1237_UART_PROTOCOL_DEVICE_CODE_INJECT_WATER:
+    case CS1237_UART_PROTOCOL_DEVICE_CODE_POUR_WATER:
+    case CS1237_UART_PROTOCOL_DEVICE_CODE_DRAW_WATER:
         return 1U;
     default:
         return 0U;

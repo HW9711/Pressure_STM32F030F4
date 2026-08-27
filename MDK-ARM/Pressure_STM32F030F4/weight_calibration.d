@@ -33,4 +33,3 @@ pressure_stm32f030f4\weight_calibration.o: ../Drivers/STM32F0xx_HAL_Driver/Inc/s
 pressure_stm32f030f4\weight_calibration.o: ../Drivers/STM32F0xx_HAL_Driver/Inc/stm32f0xx_hal_pwr_ex.h
 pressure_stm32f030f4\weight_calibration.o: ../Drivers/STM32F0xx_HAL_Driver/Inc/stm32f0xx_hal_uart.h
 pressure_stm32f030f4\weight_calibration.o: ../Drivers/STM32F0xx_HAL_Driver/Inc/stm32f0xx_hal_uart_ex.h
-pressure_stm32f030f4\weight_calibration.o: ../Core/Inc/cs1237.h
